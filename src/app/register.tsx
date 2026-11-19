@@ -2,33 +2,30 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { registerAccount } from "@/services/accountService";
 
 import AppButton from "@/components/AppButton";
 import FormField from "@/components/FormField";
 import { notesColors } from "@/constants/notes-theme";
 
 export default function RegisterScreen() {
+
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    function handleRegister() {
+    async function handleRegister() {
+        if (isSubmitting) {
+            return;
+        }
+
         setError("");
 
         if (!username.trim() || !email.trim() || !password || !confirmPassword) {
             setError("Please fill in every field.");
-            return;
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            setError("Please enter a valid email address.");
-            return;
-        }
-
-        if (password.length < 8) {
-            setError("Your password must have at least 8 characters.");
             return;
         }
 
@@ -37,10 +34,33 @@ export default function RegisterScreen() {
             return;
         }
 
-        Alert.alert(
-            "Fields checked",
-            "Your details passed our checks. Account creation will be connected next."
-        );
+        setIsSubmitting(true);
+
+        try {
+            await registerAccount({
+                username,
+                email,
+                password,
+            });
+
+            setPassword("");
+            setConfirmPassword("");
+
+            router.replace("/login");
+
+            Alert.alert(
+                "Account created",
+                "Your account is saved on this device. You can now log in."
+            );
+        } catch (error) {
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "We could not create your account. Please try again."
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     function goBack() {
@@ -85,6 +105,7 @@ export default function RegisterScreen() {
                             autoCapitalize="none"
                             autoCorrect={false}
                             autoComplete="username"
+                            editable={!isSubmitting}
                         />
 
                         <FormField
@@ -96,6 +117,7 @@ export default function RegisterScreen() {
                             autoCapitalize="none"
                             autoCorrect={false}
                             autoComplete="email"
+                            editable={!isSubmitting}
                         />
 
                         <FormField
@@ -107,9 +129,11 @@ export default function RegisterScreen() {
                             autoCapitalize="none"
                             autoCorrect={false}
                             autoComplete="new-password"
+                            editable={!isSubmitting}
                         />
 
                         <FormField
+                        editable={!isSubmitting}
                             label="Confirm password"
                             placeholder="Enter your password again"
                             value={confirmPassword}
@@ -118,6 +142,7 @@ export default function RegisterScreen() {
                             autoCapitalize="none"
                             autoCorrect={false}
                             autoComplete="new-password"
+                            
                         />
 
 
@@ -129,8 +154,9 @@ export default function RegisterScreen() {
                         )}
 
                         <AppButton
-                            title="Create account"
+                            title={isSubmitting ? "Creating account..." : "Create account"}
                             onPress={handleRegister}
+                            disabled={isSubmitting}
                         />
                     </View>
 
