@@ -14,7 +14,8 @@ export default function CategoriesScreen() {
 
         <Text style={styles.title}>Categories</Text>
 
-        <Text style={styles.subtitle}>
+        <Text style={styles.subtitle }>
+          
           Keep your thoughts in one place.
         </Text>
 
