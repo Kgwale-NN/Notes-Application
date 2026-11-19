@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { notesColors } from "@/constants/notes-theme";
 import CategoryRow from "@/components/CategoryRow";
+import { router } from "expo-router";
 
 export default function CategoriesScreen() {
   return (
@@ -21,20 +22,33 @@ export default function CategoriesScreen() {
           <CategoryRow
             name="Work"
             count={0}
-            onPress={() => Alert.alert("Work", "Your work notes will appear here.")}
+            onPress={() =>
+              router.push({
+                pathname: "/category/[id]",
+                params: { id: "work" },
+              })
+            }
           />
 
           <CategoryRow
             name="Study"
             count={0}
-            onPress={() => Alert.alert("Study", "Your study notes will appear here.")}
+            onPress={() =>
+              router.push({
+                pathname: "/category/[id]",
+                params: { id: "study" },
+              })
+            }
           />
 
           <CategoryRow
             name="Personal"
             count={0}
             onPress={() =>
-              Alert.alert("Personal", "Your personal notes will appear here.")
+              router.push({
+                pathname: "/category/[id]",
+                params: { id: "personal" },
+              })
             }
           />
         </View>
@@ -73,8 +87,8 @@ const styles = StyleSheet.create({
   },
 
   categories: {
-  marginTop: 28,
-  gap: 12,
-},
-   
+    marginTop: 28,
+    gap: 12,
+  },
+
 });
