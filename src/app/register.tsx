@@ -120,6 +120,8 @@ export default function RegisterScreen() {
               autoComplete="new-password"
             />
 
+            
+
             {error !== "" && (
               <Text accessibilityRole="alert" style={styles.error}>
                 {error}
@@ -131,6 +133,18 @@ export default function RegisterScreen() {
               onPress={handleRegister}
             />
           </View>
+
+          <View style={styles.footer}>
+  <Text style={styles.footerText}>Already have an account?</Text>
+
+  <Pressable
+    accessibilityRole="button"
+    onPress={() => router.replace("/login")}
+    style={styles.footerButton}
+  >
+    <Text style={styles.footerLink}>Log in</Text>
+  </Pressable>
+</View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,4 +198,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#B42318",
   },
+
+  footer: {
+  marginTop: "auto",
+  paddingTop: 48,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "center",
+  columnGap: 6,
+},
+footerText: {
+  fontSize: 14,
+  color: notesColors.text,
+},
+footerButton: {
+  minHeight: 44,
+  justifyContent: "center",
+  paddingHorizontal: 4,
+},
+footerLink: {
+  fontSize: 14,
+  fontWeight: "600",
+  color: notesColors.text,
+  textDecorationLine: "underline",
+},
 });

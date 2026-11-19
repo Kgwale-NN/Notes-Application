@@ -1,4 +1,4 @@
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import {ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
@@ -34,15 +34,12 @@ export default function WelcomeScreen() {
 
                         <AppButton
                             title="Log in"
-                            onPress={() =>
-                                Alert.alert(
-                                    "Log in",
-                                    "We will connect this button to the login screen."
-                                )
-                            }
+                            onPress={() => router.push("/login")}
                         />
                     </View>
                 </View>
+
+                
             </ScrollView>
         </SafeAreaView>
     );
