@@ -19,7 +19,7 @@ export default function CategoryScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/");
+      router.replace("/categories");
     }
   }
 

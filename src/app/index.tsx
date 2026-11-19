@@ -1,60 +1,53 @@
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppButton from "@/components/AppButton";
 import { notesColors } from "@/constants/notes-theme";
-import CategoryRow from "@/components/CategoryRow";
-import { router } from "expo-router";
 
-export default function CategoriesScreen() {
+export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.brand}>
+          <View style={styles.logo}>
+            <Text style={styles.logoLetter}>N</Text>
+          </View>
 
-      <View style={styles.content}>
-        <View style={styles.accentLine} />
-
-        <Text style={styles.title}>Categories</Text>
-
-        <Text style={styles.subtitle }>
-          
-          Keep your thoughts in one place.
-        </Text>
-
-        <View style={styles.categories}>
-          <CategoryRow
-            name="Work"
-            count={0}
-            onPress={() =>
-              router.push({
-                pathname: "/category/[id]",
-                params: { id: "work" },
-              })
-            }
-          />
-
-          <CategoryRow
-            name="Study"
-            count={0}
-            onPress={() =>
-              router.push({
-                pathname: "/category/[id]",
-                params: { id: "study" },
-              })
-            }
-          />
-
-          <CategoryRow
-            name="Personal"
-            count={0}
-            onPress={() =>
-              router.push({
-                pathname: "/category/[id]",
-                params: { id: "personal" },
-              })
-            }
-          />
+          <Text style={styles.appName}>Notes</Text>
         </View>
-      </View>
 
+        <View style={styles.bottom}>
+          <Text style={styles.tagline}>
+            A little space for your thoughts.
+          </Text>
+
+          <View style={styles.buttons}>
+            <AppButton
+              title="Create account"
+              variant="secondary"
+              onPress={() =>
+                Alert.alert(
+                  "Create account",
+                  "We will build this screen next."
+                )
+              }
+            />
+
+            <AppButton
+              title="Log in"
+              onPress={() =>
+                Alert.alert(
+                  "Log in",
+                  "We will connect this button to the login screen."
+                )
+              }
+            />
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -62,34 +55,54 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: notesColors.background,
+    backgroundColor: notesColors.surface,
   },
   content: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 72,
+    paddingBottom: 24,
   },
-  accentLine: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  logo: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: notesColors.accent,
-    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  title: {
-    fontSize: 34,
+  logoLetter: {
+    fontSize: 30,
     fontWeight: "700",
     color: notesColors.text,
   },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
+  appName: {
+    fontSize: 36,
+    fontWeight: "700",
+    color: notesColors.text,
+    flexShrink: 1,
+  },
+  bottom: {
+    marginTop: "auto",
+    paddingTop: 80,
+  },
+  tagline: {
+    fontSize: 14,
+    lineHeight: 22,
     color: notesColors.muted,
-    marginTop: 8,
+    textAlign: "center",
+    marginBottom: 28,
   },
-
-  categories: {
-    marginTop: 28,
-    gap: 12,
+  buttons: {
+    gap: 10,
   },
-
 });
