@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
+import AppIcon from "@/components/AppIcon";
 import FormField from "@/components/FormField";
 import { notesColors } from "@/constants/notes-theme";
 import { categories, useNotes, type Note } from "@/hooks/use-notes";
@@ -71,10 +72,11 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Pressable
             accessibilityRole="button"
-            style={styles.back}
+            style={[styles.back, styles.backWithIcon]}
             disabled={saving}
             onPress={() => router.canGoBack() ? router.back() : router.replace("/categories")}
           >
+            <AppIcon name="chevronLeft" size={16} />
             <Text style={styles.link}>Back to categories</Text>
           </Pressable>
 
@@ -131,8 +133,11 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
                     style={({ pressed }) => [styles.card, pressed && styles.pressed]}
                     onPress={() => openDraft(note)}
                   >
-                    <Text style={styles.heading} numberOfLines={2}>{note.title || "Untitled note"}</Text>
-                    {note.body ? <Text style={styles.message} numberOfLines={3}>{note.body}</Text> : null}
+                    <View style={styles.cardText}>
+                      <Text style={styles.heading} numberOfLines={2}>{note.title || "Untitled note"}</Text>
+                      {note.body ? <Text style={styles.message} numberOfLines={3}>{note.body}</Text> : null}
+                    </View>
+                    <AppIcon name="chevronRight" size={16} color={notesColors.muted} />
                   </Pressable>
                 ))
               )}
@@ -149,11 +154,12 @@ const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   content: { width: "100%", maxWidth: 600, alignSelf: "center", padding: 24 },
   back: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center" },
+  backWithIcon: { flexDirection: "row", alignItems: "center", gap: 6 },
   link: { fontSize: 16, color: notesColors.text },
   title: { fontSize: 34, fontWeight: "700", color: notesColors.text, marginTop: 12 },
   section: { marginTop: 24, gap: 12 },
   heading: { fontSize: 18, fontWeight: "600", color: notesColors.text },
-  bodyField: { minHeight: 144, textAlignVertical: "top" },
+  bodyField: { minHeight: 240, textAlignVertical: "top" },
   message: { fontSize: 16, lineHeight: 24, color: notesColors.muted },
   error: { fontSize: 15, color: "#B42318" },
   card: {
@@ -162,7 +168,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 16,
-    gap: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
+  cardText: { flex: 1, minWidth: 0, gap: 6 },
   pressed: { opacity: 0.7 },
 });
