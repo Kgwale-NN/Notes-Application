@@ -41,12 +41,13 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const categoryNotes = notes.filter(note => note.category === category.id);
-  const query = search.trim().toLowerCase();
-  const matchingNotes = query
-    ? categoryNotes.filter(note =>
-        note.title.toLowerCase().includes(query) ||
-        note.body.toLowerCase().includes(query)
-      )
+  const searchWords = search.toLowerCase().match(/\S+/g) ?? [];
+  const matchingNotes = searchWords.length > 0
+    ? categoryNotes.filter(note => {
+        const title = note.title.toLowerCase();
+        const body = note.body.toLowerCase();
+        return searchWords.every(word => title.includes(word) || body.includes(word));
+      })
     : categoryNotes;
   const sortedNotes = [...matchingNotes].sort((left, right) => {
     if (!left.createdAt) return right.createdAt ? 1 : 0;
