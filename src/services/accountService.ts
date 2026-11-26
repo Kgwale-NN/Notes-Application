@@ -1,11 +1,13 @@
 import * as Crypto from "expo-crypto";
 
 import { readData, saveData } from "@/storage/appStorage";
+import { saveDevicePassword, verifyDevicePassword } from "@/services/devicePasswordVerifier";
 import {
   createPasswordRecord,
   verifyPassword,
 } from "@/services/passwordService";
 import type { StoredAccount, UserProfile } from "@/types/account";
+import { withDeadline } from "@/services/withDeadline";
 
 const ACCOUNTS_KEY = "accounts";
 
@@ -21,6 +23,7 @@ function isStoredAccount(value: unknown): value is StoredAccount {
   }
 
   const account = value as Partial<StoredAccount>;
+  const credentials = account.credentials;
 
   return (
     typeof account.profile?.id === "string" &&
@@ -28,15 +31,22 @@ function isStoredAccount(value: unknown): value is StoredAccount {
     typeof account.profile?.email === "string" &&
     typeof account.profile?.createdAt === "string" &&
     typeof account.profile?.updatedAt === "string" &&
-    account.credentials?.algorithm === "pbkdf2-sha256" &&
-    typeof account.credentials?.hash === "string" &&
-    typeof account.credentials?.salt === "string" &&
-    account.credentials?.iterations === 600_000
+    (
+      credentials?.algorithm === "device-hmac-sha256" ||
+      (credentials?.algorithm === "pbkdf2-sha256" &&
+        typeof credentials.hash === "string" &&
+        typeof credentials.salt === "string" &&
+        credentials.iterations === 600_000)
+    )
   );
 }
 
 async function loadAccounts(): Promise<StoredAccount[]> {
-  const data = await readData(ACCOUNTS_KEY);
+  const data = await withDeadline(
+    readData(ACCOUNTS_KEY),
+    8_000,
+    "Notes could not open account storage. Close and reopen the app, then try again."
+  );
 
   if (data === null) {
     return [];
@@ -88,7 +98,6 @@ export function registerAccount({
       throw new Error("This username is already taken.");
     }
 
-    const credentials = await createPasswordRecord(password);
     const now = new Date().toISOString();
 
     const profile: UserProfile = {
@@ -101,9 +110,13 @@ export function registerAccount({
 
     const account: StoredAccount = {
       profile,
-      credentials,
+      credentials: { algorithm: "device-hmac-sha256" },
     };
 
+    // Persist a device-only account only after its verifier is safely stored.
+    if (!(await saveDevicePassword(account, password))) {
+      account.credentials = await createPasswordRecord(password);
+    }
     await saveData(ACCOUNTS_KEY, [...accounts, account]);
 
     return profile;
@@ -114,7 +127,12 @@ export function registerAccount({
     () => undefined
   );
 
-  return task;
+  // Keep writes serialized even if the registration screen stops waiting.
+  return withDeadline(
+    task,
+    140_000,
+    "Account creation is taking too long. Try logging in before submitting again."
+  );
 }
 
 export async function loginAccount(
@@ -132,11 +150,19 @@ export async function loginAccount(
     throw new Error("Your email or password is incorrect.");
   }
 
-  const matches = await verifyPassword(password, account.credentials);
+  const deviceMatch = await verifyDevicePassword(account, password);
+  if (deviceMatch === true) return account.profile;
 
-  if (!matches) {
-    throw new Error("Your email or password is incorrect.");
+  if (deviceMatch === null) {
+    if (account.credentials.algorithm === "device-hmac-sha256") {
+      throw new Error("Notes could not access this account’s password verifier. Open Notes on the device where you created the account and try again.");
+    }
+
+    if (await verifyPassword(password, account.credentials)) {
+      await saveDevicePassword(account, password);
+      return account.profile;
+    }
   }
 
-  return account.profile;
+  throw new Error("Your email or password is incorrect.");
 }

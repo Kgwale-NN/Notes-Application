@@ -1,18 +1,25 @@
-import { useState } from "react";
-import { router } from "expo-router";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, } from "react-native";
+import { useRef, useState } from "react";
+import { Redirect, router } from "expo-router";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
 import FormField from "@/components/FormField";
 import { notesColors } from "@/constants/notes-theme";
 
+import { useNotes } from "@/hooks/use-notes";
+
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
 
-    function handleLogin() {
+    const { profile, signIn } = useNotes();
+    const submitting = useRef(false);
+    const [busy, setBusy] = useState(false);
+
+    async function handleLogin() {
+        if (submitting.current) return;
         setError("");
 
         if (!email.trim() || !password) {
@@ -25,11 +32,19 @@ export default function LoginScreen() {
             return;
         }
 
-        Alert.alert(
-            "Fields checked",
-            "The fields are filled in correctly. Real login will be connected next."
-        );
+        submitting.current = true;
+        setBusy(true);
+        try {
+            await signIn(email, password);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Unable to log in.");
+        } finally {
+            submitting.current = false;
+            setBusy(false);
+        }
     }
+
+    if (profile) return <Redirect href="/categories" />;
 
     function goBack() {
         if (router.canGoBack()) {
@@ -53,6 +68,7 @@ export default function LoginScreen() {
                     <Pressable
                         accessibilityRole="button"
                         onPress={goBack}
+                        disabled={busy}
                         style={styles.backButton}
                     >
                         <Text style={styles.backText}>Back</Text>
@@ -93,21 +109,9 @@ export default function LoginScreen() {
                             </Text>
                         )}
 
-                        <Pressable
-                            accessibilityRole="button"
-                            onPress={() =>
-                                Alert.alert(
-                                    "Forgot password",
-                                    "Password reset will be connected when we add real accounts."
-                                )
-                            }
-                            style={styles.forgotButton}
-                        >
-                            <Text style={styles.forgotText}>Forgot password?</Text>
-                        </Pressable>
-
                         <AppButton
-                            title="Log in"
+                            title={busy ? "Logging in…" : "Log in"}
+                            loading={busy}
                             onPress={handleLogin}
                         />
                     </View>
@@ -120,6 +124,7 @@ export default function LoginScreen() {
                         <Pressable
                             accessibilityRole="button"
                             onPress={() => router.replace("/register")}
+                            disabled={busy}
                             style={styles.footerButton}
                         >
                             <Text style={styles.footerLink}>Create account</Text>
@@ -201,16 +206,5 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: notesColors.text,
         textDecorationLine: "underline",
-    },
-
-    forgotButton: {
-        minHeight: 44,
-        alignSelf: "flex-start",
-        justifyContent: "center",
-    },
-    forgotText: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#B81758",
     },
 });

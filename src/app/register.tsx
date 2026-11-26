@@ -154,9 +154,9 @@ export default function RegisterScreen() {
                         )}
 
                         <AppButton
-                            title={isSubmitting ? "Creating account..." : "Create account"}
+                            title={isSubmitting ? "Creating account…" : "Create account"}
                             onPress={handleRegister}
-                            disabled={isSubmitting}
+                            loading={isSubmitting}
                         />
                     </View>
 

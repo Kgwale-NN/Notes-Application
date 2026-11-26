@@ -15,5 +15,5 @@ export type PasswordRecord = {
 
 export type StoredAccount = {
   profile: UserProfile;
-  credentials: PasswordRecord;
+  credentials: PasswordRecord | { algorithm: "device-hmac-sha256" };
 };

@@ -7,7 +7,7 @@ type FormFieldProps = TextInputProps & {
   label: string;
 };
 
-export default function FormField({label,secureTextEntry = false,...inputProps}: FormFieldProps) {
+export default function FormField({label,secureTextEntry = false, style, ...inputProps}: FormFieldProps) {
 
   const [passwordVisible, setPasswordVisible] = useState(false);
 
@@ -22,7 +22,7 @@ export default function FormField({label,secureTextEntry = false,...inputProps}:
           accessibilityLabel={label}
           secureTextEntry={secureTextEntry && !passwordVisible}
           placeholderTextColor={notesColors.muted}
-          style={styles.input}
+          style={[styles.input, style]}
         />
 
         {secureTextEntry && (
