@@ -1,6 +1,6 @@
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
@@ -26,13 +26,43 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
   const { notes, saving, saveNote, deleteNote } = useNotes();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
   const categoryNotes = notes.filter(note => note.category === category.id);
+  const savedNote = draft?.id ? categoryNotes.find(note => note.id === draft.id) : null;
+  const hasUnsavedChanges = draft !== null && (
+    draft.title !== (savedNote?.title ?? "") ||
+    draft.body !== (savedNote?.body ?? "")
+  );
+
+  usePreventRemove(hasUnsavedChanges || (draft !== null && saving), ({ repeat }) => {
+    if (saving || discardPrompt) return;
+
+    Keyboard.dismiss();
+    setDiscardPrompt({ leave: repeat });
+  });
 
   function openDraft(next: Draft | null) {
     setDraft(next);
     setConfirmDelete(false);
     setError("");
+  }
+
+  function cancelEditing() {
+    if (hasUnsavedChanges) {
+      Keyboard.dismiss();
+      setDiscardPrompt({});
+      return;
+    }
+
+    openDraft(null);
+  }
+
+  function discardChanges() {
+    const leave = discardPrompt?.leave;
+    setDiscardPrompt(null);
+    openDraft(null);
+    leave?.();
   }
 
   async function handleSave() {
@@ -107,7 +137,7 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
               ) : (
                 <>
                   <AppButton title="Save note" disabled={saving} onPress={handleSave} />
-                  <AppButton title="Cancel editing" variant="secondary" disabled={saving} onPress={() => openDraft(null)} />
+                  <AppButton title="Cancel editing" variant="secondary" disabled={saving} onPress={cancelEditing} />
                   {draft.id ? (
                     <Pressable accessibilityRole="button" style={styles.back} disabled={saving} onPress={() => setConfirmDelete(true)}>
                       <Text style={styles.error}>Delete note</Text>
@@ -145,6 +175,21 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        visible={discardPrompt !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDiscardPrompt(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dialog} accessibilityViewIsModal>
+            <Text accessibilityRole="header" style={styles.heading}>Discard changes?</Text>
+            <Text style={styles.message}>Your unsaved edits will be lost.</Text>
+            <AppButton title="Keep editing" onPress={() => setDiscardPrompt(null)} />
+            <AppButton title="Discard changes" variant="secondary" onPress={discardChanges} />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -174,4 +219,19 @@ const styles = StyleSheet.create({
   },
   cardText: { flex: 1, minWidth: 0, gap: 6 },
   pressed: { opacity: 0.7 },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  dialog: {
+    width: "100%",
+    maxWidth: 400,
+    padding: 24,
+    gap: 12,
+    borderRadius: 20,
+    backgroundColor: notesColors.surface,
+  },
 });
