@@ -24,36 +24,28 @@ export type Note = {
   updatedAt?: string;
 };
 
+type Workspace = { categories: Category[]; notes: Note[] };
+const emptyWorkspace: Workspace = { categories: defaultCategories, notes: [] };
+
 function useNotesState() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [folders, setFolders] = useState<Category[]>([]);
-  const categories = [...defaultCategories, ...folders];
+  const [workspace, setWorkspace] = useState(emptyWorkspace);
+  const { categories, notes } = workspace;
   const [saving, setSaving] = useState(false);
   const writeInProgress = useRef(false);
 
   async function signIn(email: string, password: string) {
     const feedback = authFeedbackDelay();
     const account = await loginAccount(email, password);
-    const [saved, savedFolders] = await withDeadline(
-      Promise.all([readData("notes:" + account.id), readData("folders:" + account.id)]),
+    const saved = await withDeadline(
+      loadWorkspace(account.id),
       8_000,
       "Notes could not open your saved notes. Close and reopen the app, then try again."
     );
 
-    if (savedFolders !== null && (!Array.isArray(savedFolders) || !savedFolders.every(isFolder))) {
-      throw new Error("Saved folders could not be read.");
-    }
-
-    const folderIds = new Set([...defaultCategories, ...(savedFolders ?? [])].map(folder => folder.id));
-    if (saved !== null && (!Array.isArray(saved) || !saved.every(note => isNote(note, folderIds)))) {
-      throw new Error("Saved notes could not be read.");
-    }
-
     // Updating the profile lets the protected navigator leave the login screen.
     await feedback;
-    setNotes(saved ?? []);
-    setFolders(savedFolders ?? []);
+    setWorkspace(saved);
     setProfile(account);
   }
 
@@ -61,8 +53,7 @@ function useNotesState() {
     if (writeInProgress.current) return;
 
     setProfile(null);
-    setNotes([]);
-    setFolders([]);
+    setWorkspace(emptyWorkspace);
   }
 
   async function updateProfile(changes: ProfileChanges) {
@@ -82,7 +73,7 @@ function useNotesState() {
     }
   }
 
-  async function persist(write: (accountId: string) => Promise<void>) {
+  async function persist(next: Workspace) {
     if (!profile || writeInProgress.current) {
       throw new Error("Notes are currently unavailable. Please try again.");
     }
@@ -90,7 +81,8 @@ function useNotesState() {
     writeInProgress.current = true;
     setSaving(true);
     try {
-      await write(profile.id);
+      await saveData("notes:" + profile.id, next);
+      setWorkspace(next);
     } finally {
       writeInProgress.current = false;
       setSaving(false);
@@ -98,10 +90,7 @@ function useNotesState() {
   }
 
   function persistNotes(next: Note[]) {
-    return persist(async accountId => {
-      await saveData("notes:" + accountId, next);
-      setNotes(next);
-    });
+    return persist({ categories, notes: next });
   }
 
   async function createFolder(name: string) {
@@ -111,10 +100,13 @@ function useNotesState() {
       throw new Error("A folder with that name already exists.");
     }
 
-    const next = [...folders, { id: randomUUID(), name: cleanName }];
-    await persist(async accountId => {
-      await saveData("folders:" + accountId, next);
-      setFolders(next);
+    await persist({ categories: [...categories, { id: randomUUID(), name: cleanName }], notes });
+  }
+
+  function deleteCategory(id: string) {
+    return persist({
+      categories: categories.filter(category => category.id !== id),
+      notes: notes.filter(note => note.category !== id),
     });
   }
 
@@ -139,9 +131,37 @@ function useNotesState() {
     return persistNotes(notes.filter(note => note.id !== id));
   }
 
-  return { profile, notes, categories, saving, signIn, signOut, updateProfile, createFolder, saveNote, deleteNote };
+  return { profile, notes, categories, saving, signIn, signOut, updateProfile, createFolder, deleteCategory, saveNote, deleteNote };
 }
 
+async function loadWorkspace(accountId: string): Promise<Workspace> {
+  const stored = await readData("notes:" + accountId);
+  if (stored === null || Array.isArray(stored)) {
+    const folders = await readData("folders:" + accountId);
+    if (folders !== null && (!Array.isArray(folders) || !folders.every(isFolder))) {
+      throw new Error("Saved folders could not be read.");
+    }
+    return validateWorkspace([...defaultCategories, ...(folders ?? [])], stored ?? []);
+  }
+
+  if (typeof stored === "object" && stored) {
+    const { categories, notes } = stored as Partial<Workspace>;
+    return validateWorkspace(categories, notes);
+  }
+
+  throw new Error("Saved notes could not be read.");
+}
+
+function validateWorkspace(categories: unknown, notes: unknown): Workspace {
+  if (!Array.isArray(categories) || !categories.every(isFolder)) {
+    throw new Error("Saved folders could not be read.");
+  }
+  const folderIds = new Set(categories.map(folder => folder.id));
+  if (!Array.isArray(notes) || !notes.every(note => isNote(note, folderIds))) {
+    throw new Error("Saved notes could not be read.");
+  }
+  return { categories, notes };
+}
 function isFolder(value: unknown): value is Category {
   if (typeof value !== "object" || value === null) return false;
 

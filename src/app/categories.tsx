@@ -1,4 +1,3 @@
-import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from "expo-glass-effect";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -10,53 +9,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
-import AppIcon, { type AppIconName } from "@/components/AppIcon";
+import AppIcon from "@/components/AppIcon";
 import CategoryRow from "@/components/CategoryRow";
 import FormField from "@/components/FormField";
+import GlassIconButton from "@/components/GlassIconButton";
+import NoteSearchBar from "@/components/NoteSearchBar";
 import { notesColors } from "@/constants/notes-theme";
 import { useNotes } from "@/hooks/use-notes";
 import { searchNotes } from "@/services/noteSearch";
-
-function GlassBackground() {
-  if (Platform.OS === "ios" && isGlassEffectAPIAvailable() && isLiquidGlassAvailable()) {
-    return (
-      <GlassView
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, styles.glassShape]}
-        colorScheme="light"
-      />
-    );
-  }
-
-  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glassFallback]} />;
-}
-
-function HeaderButton({ label, icon, onPress, disabled }: {
-  label: string;
-  icon: AppIconName;
-  onPress: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      accessibilityState={{ disabled }}
-      style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
-      onPress={onPress}
-    >
-      <GlassBackground />
-      <AppIcon name={icon} size={24} />
-    </Pressable>
-  );
-}
 
 export default function CategoriesScreen() {
   const { categories, notes, saving, createFolder } = useNotes();
@@ -91,8 +56,8 @@ export default function CategoriesScreen() {
         <View style={styles.header}>
           <View style={styles.accentLine} />
           <View style={styles.headerButtons}>
-            <HeaderButton label="New folder" icon="folderPlus" onPress={openNewFolder} disabled={saving} />
-            <HeaderButton label="Profile" icon="profile" onPress={() => router.push("/profile")} disabled={saving} />
+            <GlassIconButton label="New folder" icon="folderPlus" onPress={openNewFolder} disabled={saving} />
+            <GlassIconButton label="Profile" icon="profile" onPress={() => router.push("/profile")} disabled={saving} />
           </View>
         </View>
 
@@ -131,7 +96,11 @@ export default function CategoriesScreen() {
             </View>
           ) : (
             <>
-              <Text style={styles.subtitle}>Choose a category to view or write notes.</Text>
+              <Text style={styles.subtitle}>
+                {categories.length > 0
+                  ? "Choose a category to view or write notes."
+                  : "No categories yet. Tap New folder to add one."}
+              </Text>
               <View style={styles.categories}>
                 {categories.map(({ id, name }) => (
                   <CategoryRow
@@ -146,33 +115,7 @@ export default function CategoriesScreen() {
           )}
         </ScrollView>
 
-        <View style={styles.searchDock}>
-          <View style={styles.searchBar}>
-            <GlassBackground />
-            <AppIcon name="search" size={21} />
-            <TextInput
-              accessibilityLabel="Search all notes"
-              style={styles.searchInput}
-              placeholder="Search all notes"
-              placeholderTextColor={notesColors.muted}
-              value={search}
-              onChangeText={setSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {search.length > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                style={styles.clearButton}
-                onPress={() => setSearch("")}
-              >
-                <AppIcon name="close" size={19} color={notesColors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
+        <NoteSearchBar label="Search all notes" value={search} onChangeText={setSearch} />
       </KeyboardAvoidingView>
 
       <Modal
@@ -216,20 +159,6 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   headerButtons: { flexDirection: "row", gap: 10 },
-  headerButton: {
-    width: 52,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  glassShape: { borderRadius: 28 },
-  glassFallback: {
-    borderRadius: 28,
-    backgroundColor: "rgba(255, 255, 255, 0.86)",
-    borderWidth: 1,
-    borderColor: notesColors.surface,
-    boxShadow: "0px 3px 12px rgba(23, 23, 23, 0.10)",
-  },
   content: { width: "100%", maxWidth: 600, alignSelf: "center", paddingHorizontal: 24, paddingBottom: 16 },
   accentLine: { width: 36, height: 4, borderRadius: 2, backgroundColor: notesColors.accent },
   title: { fontSize: 34, fontWeight: "700", color: notesColors.text },
@@ -247,10 +176,6 @@ const styles = StyleSheet.create({
   resultText: { flex: 1, minWidth: 0, gap: 4 },
   resultTitle: { color: notesColors.text, fontSize: 17, fontWeight: "600" },
   resultMeta: { color: notesColors.muted, fontSize: 14, lineHeight: 20 },
-  searchDock: { width: "100%", maxWidth: 600, alignSelf: "center", paddingHorizontal: 24, paddingTop: 8, paddingBottom: 10 },
-  searchBar: { minHeight: 54, flexDirection: "row", alignItems: "center", paddingLeft: 16, gap: 10 },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 54, paddingVertical: 8, paddingRight: 12, color: notesColors.text, fontSize: 16 },
-  clearButton: { width: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "rgba(0, 0, 0, 0.45)" },
   dialog: { width: "100%", maxWidth: 400, padding: 24, gap: 12, borderRadius: 20, backgroundColor: notesColors.surface },
   dialogTitle: { fontSize: 22, fontWeight: "700", color: notesColors.text },

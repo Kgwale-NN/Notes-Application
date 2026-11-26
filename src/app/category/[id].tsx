@@ -6,6 +6,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AppButton from "@/components/AppButton";
 import AppIcon from "@/components/AppIcon";
 import FormField from "@/components/FormField";
+import GlassIconButton from "@/components/GlassIconButton";
+import NoteSearchBar from "@/components/NoteSearchBar";
 import { notesColors } from "@/constants/notes-theme";
 import { useNotes, type Category, type Note } from "@/hooks/use-notes";
 import { searchNotes } from "@/services/noteSearch";
@@ -34,13 +36,15 @@ export default function CategoryScreen() {
 }
 
 function CategoryNotes({ category, selectedNote }: { category: Category; selectedNote?: Note }) {
-  const { notes, saving, saveNote, deleteNote } = useNotes();
+  const { notes, saving, saveNote, deleteNote, deleteCategory } = useNotes();
   const [draft, setDraft] = useState<Draft | null>(selectedNote ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [categoryMenu, setCategoryMenu] = useState<"options" | "delete" | null>(null);
+  const [categoryError, setCategoryError] = useState("");
   const categoryNotes = notes.filter(note => note.category === category.id);
   const matchingNotes = searchNotes(categoryNotes, search);
   const sortedNotes = [...matchingNotes].sort((left, right) => {
@@ -63,7 +67,34 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
     setDiscardPrompt({ leave: repeat });
   });
 
+  function goBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/categories");
+  }
+
+  function openCategoryMenu() {
+    Keyboard.dismiss();
+    setCategoryError("");
+    setCategoryMenu("options");
+  }
+
+  function closeCategoryMenu() {
+    if (!saving) setCategoryMenu(null);
+  }
+
+  async function handleDeleteCategory() {
+    setCategoryError("");
+    try {
+      await deleteCategory(category.id);
+      setCategoryMenu(null);
+      goBack();
+    } catch {
+      setCategoryError("Unable to delete this category. Please try again.");
+    }
+  }
+
   function openDraft(next: Draft | null) {
+    if (next) Keyboard.dismiss();
     setDraft(next);
     setConfirmDelete(false);
     setError("");
@@ -120,17 +151,13 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable
-            accessibilityRole="button"
-            style={[styles.back, styles.backWithIcon]}
-            disabled={saving}
-            onPress={() => router.canGoBack() ? router.back() : router.replace("/categories")}
-          >
-            <AppIcon name="chevronLeft" size={16} />
-            <Text style={styles.link}>Back to categories</Text>
-          </Pressable>
-
+        <View style={styles.toolbar}>
+          <GlassIconButton label="Go back" icon="chevronLeft" disabled={saving} onPress={goBack} />
+          {!draft && (
+            <GlassIconButton label="Category options" icon="more" disabled={saving} onPress={openCategoryMenu} />
+          )}
+        </View>
+        <ScrollView style={styles.keyboard} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text accessibilityRole="header" style={styles.title}>{category.name}</Text>
 
           {draft ? (
@@ -169,39 +196,6 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
             </View>
           ) : (
             <View style={styles.section}>
-              <AppButton
-                title="New note"
-                icon="plus"
-                onPress={() => openDraft({ title: "", body: "" })}
-              />
-              {categoryNotes.length > 0 ? (
-                <>
-                  <FormField
-                    label="Search notes"
-                    placeholder="Search by title or text"
-                    value={search}
-                    onChangeText={setSearch}
-                    clearButtonMode="while-editing"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="search"
-                  />
-                  <Text style={styles.sortLabel}>Sort by date added</Text>
-                  <View style={styles.sortOptions}>
-                    {sortOptions.map(({ value, label }) => (
-                      <Pressable
-                        key={value}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: sortOrder === value }}
-                        onPress={() => setSortOrder(value)}
-                        style={[styles.sortButton, sortOrder === value && styles.sortSelected]}
-                      >
-                        <Text style={styles.sortLabel}>{label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </>
-              ) : null}
               {categoryNotes.length === 0 ? (
                 <Text style={styles.message}>No notes in this category yet.</Text>
               ) : matchingNotes.length === 0 ? (
@@ -233,7 +227,64 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
             </View>
           )}
         </ScrollView>
+        {!draft && (
+          <NoteSearchBar
+            label="Search notes"
+            value={search}
+            onChangeText={setSearch}
+            onNewNote={() => openDraft({ title: "", body: "" })}
+          />
+        )}
       </KeyboardAvoidingView>
+      <Modal
+        visible={categoryMenu !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCategoryMenu}
+      >
+        {categoryMenu === "delete" ? (
+          <View style={styles.modalBackdrop}>
+            <View style={styles.dialog} accessibilityViewIsModal>
+              <Text accessibilityRole="header" style={styles.heading}>Delete {category.name}?</Text>
+              <Text style={styles.message}>This permanently deletes the category and all notes inside it.</Text>
+              {categoryError ? <Text accessibilityRole="alert" style={styles.error}>{categoryError}</Text> : null}
+              <AppButton title={saving ? "Deleting category…" : "Delete category"} loading={saving} onPress={handleDeleteCategory} />
+              <AppButton title="Cancel" variant="secondary" disabled={saving} onPress={closeCategoryMenu} />
+            </View>
+          </View>
+        ) : (
+          <SafeAreaView style={styles.menuBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close category options"
+              style={StyleSheet.absoluteFill}
+              onPress={closeCategoryMenu}
+            />
+            <View style={styles.menuRow}>
+              <View style={styles.menu} accessibilityViewIsModal>
+                <Text accessibilityRole="header" style={styles.menuHeading}>Sort by date added</Text>
+                {sortOptions.map(({ value, label }) => (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sortOrder === value }}
+                    onPress={() => {
+                      setSortOrder(value);
+                      closeCategoryMenu();
+                    }}
+                    style={[styles.menuItem, sortOrder === value && styles.sortSelected]}
+                  >
+                    <Text style={styles.menuLabel}>{label}</Text>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="button" style={styles.menuItem} onPress={() => setCategoryMenu("delete")}>
+                  <Text style={styles.error}>Delete category</Text>
+                </Pressable>
+              </View>
+            </View>
+          </SafeAreaView>
+        )}
+      </Modal>
       <Modal
         visible={discardPrompt !== null}
         transparent
@@ -256,26 +307,42 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: notesColors.background },
   keyboard: { flex: 1 },
-  content: { width: "100%", maxWidth: 600, alignSelf: "center", padding: 24 },
+  toolbar: {
+    width: "100%",
+    maxWidth: 600,
+    alignSelf: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  content: { width: "100%", maxWidth: 600, alignSelf: "center", paddingHorizontal: 24, paddingBottom: 24 },
   back: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center" },
-  backWithIcon: { flexDirection: "row", alignItems: "center", gap: 6 },
-  link: { fontSize: 16, color: notesColors.text },
   title: { fontSize: 34, fontWeight: "700", color: notesColors.text, marginTop: 12 },
   section: { marginTop: 24, gap: 12 },
   heading: { fontSize: 18, fontWeight: "600", color: notesColors.text },
   bodyField: { minHeight: 240, textAlignVertical: "top" },
   message: { fontSize: 16, lineHeight: 24, color: notesColors.muted },
   error: { fontSize: 15, color: "#B42318" },
-  sortLabel: { fontSize: 14, fontWeight: "600", color: notesColors.text },
-  sortOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  sortButton: {
+  menuBackdrop: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.15)" },
+  menuRow: { width: "100%", maxWidth: 600, alignSelf: "center", alignItems: "flex-end", paddingHorizontal: 24, paddingTop: 68, pointerEvents: "box-none" },
+  menu: {
+    width: 220,
+    maxWidth: "100%",
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: notesColors.surface,
+    boxShadow: "0px 4px 18px rgba(23, 23, 23, 0.12)",
+  },
+  menuHeading: { fontSize: 13, fontWeight: "600", color: notesColors.muted, padding: 12 },
+  menuItem: {
     minHeight: 44,
     justifyContent: "center",
-    paddingHorizontal: 14,
-    borderRadius: 22,
-    backgroundColor: notesColors.border,
+    paddingHorizontal: 12,
+    borderRadius: 12,
   },
-  sortSelected: { backgroundColor: notesColors.accent },
+  menuLabel: { fontSize: 15, fontWeight: "600", color: notesColors.text },
+  sortSelected: { backgroundColor: notesColors.background },
   timestamp: { fontSize: 13, color: notesColors.muted },
   card: {
     backgroundColor: notesColors.surface,

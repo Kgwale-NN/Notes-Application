@@ -9,6 +9,8 @@ const icons = {
   profile: { ios: "person.crop.circle", android: "account_circle", web: "account_circle" },
   search: { ios: "magnifyingglass", android: "search", web: "search" },
   close: { ios: "xmark.circle.fill", android: "cancel", web: "cancel" },
+  more: { ios: "ellipsis", android: "more_horiz", web: "more_horiz" },
+  compose: { ios: "square.and.pencil", android: "edit_square", web: "edit_square" },
   chevronLeft: {
     ios: "chevron.left",
     android: "chevron_left",
