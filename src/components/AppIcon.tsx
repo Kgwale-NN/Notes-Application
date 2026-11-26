@@ -11,6 +11,11 @@ const icons = {
   close: { ios: "xmark.circle.fill", android: "cancel", web: "cancel" },
   more: { ios: "ellipsis", android: "more_horiz", web: "more_horiz" },
   compose: { ios: "square.and.pencil", android: "edit_square", web: "edit_square" },
+  note: { ios: "note.text", android: "description", web: "description" },
+  check: { ios: "checkmark", android: "check", web: "check" },
+  trash: { ios: "trash", android: "delete", web: "delete" },
+  sort: { ios: "arrow.up.arrow.down", android: "swap_vert", web: "swap_vert" },
+  chevronDown: { ios: "chevron.down", android: "expand_more", web: "expand_more" },
   chevronLeft: {
     ios: "chevron.left",
     android: "chevron_left",

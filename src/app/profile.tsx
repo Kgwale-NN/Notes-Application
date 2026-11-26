@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
 import FormField from "@/components/FormField";
+import GlassIconButton from "@/components/GlassIconButton";
 import { notesColors } from "@/constants/notes-theme";
 import { useNotes } from "@/hooks/use-notes";
 import type { UserProfile } from "@/types/account";
@@ -81,10 +82,9 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <AppButton
-            title="Back to categories"
+          <GlassIconButton
+            label="Go back"
             icon="chevronLeft"
-            variant="secondary"
             disabled={busy}
             onPress={() => router.canGoBack() ? router.back() : router.replace("/categories")}
           />
@@ -160,7 +160,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: notesColors.background },
-  content: { width: "100%", maxWidth: 600, alignSelf: "center", padding: 24, gap: 16 },
+  content: { width: "100%", maxWidth: 600, alignSelf: "center", padding: 24, paddingTop: 12, gap: 16 },
   heading: { fontSize: 34, fontWeight: "700", color: notesColors.text },
   error: { fontSize: 15, color: "#B42318" },
   status: { fontSize: 15, color: notesColors.text },

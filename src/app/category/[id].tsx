@@ -1,18 +1,20 @@
 import { Redirect, router, useLocalSearchParams, usePreventRemove } from "expo-router";
 import { useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/AppButton";
 import AppIcon from "@/components/AppIcon";
-import FormField from "@/components/FormField";
+import GlassBackground from "@/components/GlassBackground";
 import GlassIconButton from "@/components/GlassIconButton";
 import NoteSearchBar from "@/components/NoteSearchBar";
 import { notesColors } from "@/constants/notes-theme";
 import { useNotes, type Category, type Note } from "@/hooks/use-notes";
 import { searchNotes } from "@/services/noteSearch";
 
-type Draft = Pick<Note, "title" | "body"> & { id?: string };
+type Draft = Pick<Note, "title" | "body" | "createdAt" | "updatedAt"> & { id?: string };
+type Menu = "categoryOptions" | "sortOptions" | "deleteCategory" | "noteOptions" | "deleteNote";
+const dangerColor = "#B42318";
 
 const sortOptions = [
   { value: "newest", label: "Newest first" },
@@ -38,14 +40,16 @@ export default function CategoryScreen() {
 function CategoryNotes({ category, selectedNote }: { category: Category; selectedNote?: Note }) {
   const { notes, saving, saveNote, deleteNote, deleteCategory } = useNotes();
   const [draft, setDraft] = useState<Draft | null>(selectedNote ?? null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [categoryMenu, setCategoryMenu] = useState<"options" | "delete" | null>(null);
+  const [menu, setMenu] = useState<Menu | null>(null);
   const [categoryError, setCategoryError] = useState("");
   const categoryNotes = notes.filter(note => note.category === category.id);
+  const sortExpanded = menu === "sortOptions";
+  const sortLabel = sortOptions.find(option => option.value === sortOrder)?.label;
+  const showEmptyCategory = !draft && categoryNotes.length === 0;
   const matchingNotes = searchNotes(categoryNotes, search);
   const sortedNotes = [...matchingNotes].sort((left, right) => {
     if (!left.createdAt) return right.createdAt ? 1 : 0;
@@ -55,6 +59,7 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
     return sortOrder === "oldest" ? difference : -difference;
   });
   const savedNote = draft?.id ? categoryNotes.find(note => note.id === draft.id) : null;
+  const editorDate = draft?.updatedAt ?? draft?.createdAt;
   const hasUnsavedChanges = draft !== null && (
     draft.title !== (savedNote?.title ?? "") ||
     draft.body !== (savedNote?.body ?? "")
@@ -72,21 +77,22 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
     else router.replace("/categories");
   }
 
-  function openCategoryMenu() {
+  function openOptions() {
     Keyboard.dismiss();
     setCategoryError("");
-    setCategoryMenu("options");
+    setError("");
+    setMenu(draft ? "noteOptions" : "categoryOptions");
   }
 
-  function closeCategoryMenu() {
-    if (!saving) setCategoryMenu(null);
+  function closeMenu() {
+    if (!saving) setMenu(null);
   }
 
   async function handleDeleteCategory() {
     setCategoryError("");
     try {
       await deleteCategory(category.id);
-      setCategoryMenu(null);
+      setMenu(null);
       goBack();
     } catch {
       setCategoryError("Unable to delete this category. Please try again.");
@@ -94,9 +100,8 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
   }
 
   function openDraft(next: Draft | null) {
-    if (next) Keyboard.dismiss();
+    Keyboard.dismiss();
     setDraft(next);
-    setConfirmDelete(false);
     setError("");
   }
 
@@ -137,11 +142,12 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
   }
 
   async function handleDelete() {
-    if (!draft?.id) return;
+    if (!draft) return;
 
     setError("");
     try {
-      await deleteNote(draft.id);
+      if (draft.id) await deleteNote(draft.id);
+      setMenu(null);
       openDraft(null);
     } catch {
       setError("Unable to delete the note. Please try again.");
@@ -149,56 +155,66 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, draft && styles.editorScreen]}>
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={styles.toolbar}>
-          <GlassIconButton label="Go back" icon="chevronLeft" disabled={saving} onPress={goBack} />
-          {!draft && (
-            <GlassIconButton label="Category options" icon="more" disabled={saving} onPress={openCategoryMenu} />
-          )}
+          <GlassIconButton label="Go back" icon="chevronLeft" disabled={saving} onPress={draft ? cancelEditing : goBack} />
+          <View style={styles.toolbarActions}>
+            <GlassIconButton
+              label={draft ? "Note options" : "Category options"}
+              icon="more"
+              disabled={saving}
+              onPress={openOptions}
+            />
+            {draft && (
+              <GlassIconButton label="Save note" icon="check" loading={saving} accent onPress={handleSave} />
+            )}
+          </View>
         </View>
-        <ScrollView style={styles.keyboard} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={styles.title}>{category.name}</Text>
+        <ScrollView
+          style={styles.keyboard}
+          contentContainerStyle={[styles.content, (showEmptyCategory || draft !== null) && styles.fillContent]}
+          keyboardShouldPersistTaps="handled"
+        >
+          {!draft && <Text accessibilityRole="header" style={styles.title}>{category.name}</Text>}
+          {showEmptyCategory && <Text style={styles.noteCount}>0 notes</Text>}
 
           {draft ? (
-            <View style={styles.section}>
-              <Text accessibilityRole="header" style={styles.heading}>{draft.id ? "Edit note" : "New note"}</Text>
-              <FormField label="Title (optional)" value={draft.title} editable={!saving} onChangeText={title => setDraft({ ...draft, title })} />
-              <FormField
-                label="Note"
+            <View style={styles.editor}>
+              {editorDate && <Text style={styles.editorDate}>{dateFormat.format(new Date(editorDate))}</Text>}
+              <TextInput
+                accessibilityLabel="Title (optional)"
+                placeholder="Title (optional)"
+                placeholderTextColor={notesColors.muted}
+                style={styles.editorTitle}
+                value={draft.title}
+                editable={!saving}
+                onChangeText={title => setDraft({ ...draft, title })}
+              />
+              {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+              <TextInput
+                accessibilityLabel="Note"
+                placeholder="Write a note"
+                placeholderTextColor={notesColors.muted}
                 multiline
-                numberOfLines={5}
                 style={styles.bodyField}
+                autoFocus={!draft.id && Platform.OS === "ios"}
+                autoCapitalize="sentences"
                 value={draft.body}
                 editable={!saving}
                 onChangeText={body => setDraft({ ...draft, body })}
               />
-
-              {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-
-              {confirmDelete ? (
-                <>
-                  <Text style={styles.message}>Permanently delete this note?</Text>
-                  <AppButton title="Delete permanently" disabled={saving} onPress={handleDelete} />
-                  <AppButton title="Keep note" variant="secondary" disabled={saving} onPress={() => setConfirmDelete(false)} />
-                </>
-              ) : (
-                <>
-                  <AppButton title="Save note" disabled={saving} onPress={handleSave} />
-                  <AppButton title="Cancel editing" variant="secondary" disabled={saving} onPress={cancelEditing} />
-                  {draft.id ? (
-                    <Pressable accessibilityRole="button" style={styles.back} disabled={saving} onPress={() => setConfirmDelete(true)}>
-                      <Text style={styles.error}>Delete note</Text>
-                    </Pressable>
-                  ) : null}
-                </>
-              )}
+            </View>
+          ) : showEmptyCategory ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <AppIcon name="note" size={34} color={notesColors.muted} />
+              </View>
+              <Text accessibilityRole="header" style={styles.emptyTitle}>No notes</Text>
             </View>
           ) : (
             <View style={styles.section}>
-              {categoryNotes.length === 0 ? (
-                <Text style={styles.message}>No notes in this category yet.</Text>
-              ) : matchingNotes.length === 0 ? (
+              {matchingNotes.length === 0 ? (
                 <Text style={styles.message} accessibilityLiveRegion="polite">
                   No notes match your search.
                 </Text>
@@ -232,53 +248,102 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
             label="Search notes"
             value={search}
             onChangeText={setSearch}
-            onNewNote={() => openDraft({ title: "", body: "" })}
+            onNewNote={() => openDraft({ title: "", body: "", createdAt: new Date().toISOString() })}
           />
         )}
       </KeyboardAvoidingView>
       <Modal
-        visible={categoryMenu !== null}
+        visible={menu !== null}
         transparent
         animationType="fade"
-        onRequestClose={closeCategoryMenu}
+        onRequestClose={closeMenu}
       >
-        {categoryMenu === "delete" ? (
+        {menu === "deleteCategory" ? (
           <View style={styles.modalBackdrop}>
             <View style={styles.dialog} accessibilityViewIsModal>
               <Text accessibilityRole="header" style={styles.heading}>Delete {category.name}?</Text>
               <Text style={styles.message}>This permanently deletes the category and all notes inside it.</Text>
               {categoryError ? <Text accessibilityRole="alert" style={styles.error}>{categoryError}</Text> : null}
               <AppButton title={saving ? "Deleting category…" : "Delete category"} loading={saving} onPress={handleDeleteCategory} />
-              <AppButton title="Cancel" variant="secondary" disabled={saving} onPress={closeCategoryMenu} />
+              <AppButton title="Cancel" variant="secondary" disabled={saving} onPress={closeMenu} />
+            </View>
+          </View>
+        ) : menu === "deleteNote" ? (
+          <View style={styles.modalBackdrop}>
+            <View style={styles.dialog} accessibilityViewIsModal>
+              <Text accessibilityRole="header" style={styles.heading}>{draft?.id ? "Delete this note?" : "Discard this draft?"}</Text>
+              <Text style={styles.message}>{draft?.id ? "This permanently deletes the note." : "Your unsaved writing will be lost."}</Text>
+              {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+              <AppButton
+                title={draft?.id ? "Delete note" : "Discard draft"}
+                icon="trash"
+                loading={saving}
+                onPress={handleDelete}
+              />
+              <AppButton title="Cancel" variant="secondary" disabled={saving} onPress={closeMenu} />
             </View>
           </View>
         ) : (
           <SafeAreaView style={styles.menuBackdrop}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close category options"
+              accessibilityLabel="Close options"
               style={StyleSheet.absoluteFill}
-              onPress={closeCategoryMenu}
+              onPress={closeMenu}
             />
-            <View style={styles.menuRow}>
+            <View style={[styles.menuRow, draft && styles.editorMenuRow]}>
               <View style={styles.menu} accessibilityViewIsModal>
-                <Text accessibilityRole="header" style={styles.menuHeading}>Sort by date added</Text>
-                {sortOptions.map(({ value, label }) => (
-                  <Pressable
-                    key={value}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: sortOrder === value }}
-                    onPress={() => {
-                      setSortOrder(value);
-                      closeCategoryMenu();
-                    }}
-                    style={[styles.menuItem, sortOrder === value && styles.sortSelected]}
-                  >
-                    <Text style={styles.menuLabel}>{label}</Text>
-                  </Pressable>
-                ))}
-                <Pressable accessibilityRole="button" style={styles.menuItem} onPress={() => setCategoryMenu("delete")}>
-                  <Text style={styles.error}>Delete category</Text>
+                <GlassBackground />
+                {(menu === "categoryOptions" || sortExpanded) && (
+                  <>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: sortExpanded }}
+                      style={styles.menuItem}
+                      onPress={() => setMenu(sortExpanded ? "categoryOptions" : "sortOptions")}
+                    >
+                      <AppIcon name="sort" size={20} />
+                      <View style={styles.sortText}>
+                        <Text style={styles.menuLabel}>Sort by</Text>
+                        <Text style={styles.sortSubtitle}>Date added · {sortLabel}</Text>
+                      </View>
+                      <AppIcon name={sortExpanded ? "chevronDown" : "chevronRight"} size={14} />
+                    </Pressable>
+                    {sortExpanded && (
+                      <View style={styles.sortChoices}>
+                        {sortOptions.map(({ value, label }) => {
+                          const selected = sortOrder === value;
+                          return (
+                            <Pressable
+                              key={value}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              onPress={() => {
+                                setSortOrder(value);
+                                closeMenu();
+                              }}
+                              style={styles.menuItem}
+                            >
+                              <View style={styles.sortCheck}>
+                                {selected && <AppIcon name="check" size={16} />}
+                              </View>
+                              <Text style={styles.menuLabel}>{label}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                    <View style={styles.menuDivider} />
+                  </>
+                )}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={draft ? (draft.id ? "Delete note" : "Discard draft") : "Delete category"}
+                  style={styles.menuItem}
+                  onPress={() => setMenu(draft ? "deleteNote" : "deleteCategory")}
+                >
+                  <AppIcon name="trash" size={20} color={dangerColor} />
+                  <Text style={styles.deleteLabel}>Delete</Text>
                 </Pressable>
               </View>
             </View>
@@ -306,6 +371,7 @@ function CategoryNotes({ category, selectedNote }: { category: Category; selecte
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: notesColors.background },
+  editorScreen: { backgroundColor: notesColors.surface },
   keyboard: { flex: 1 },
   toolbar: {
     width: "100%",
@@ -316,33 +382,66 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 12,
   },
+  toolbarActions: { flexDirection: "row", gap: 10 },
   content: { width: "100%", maxWidth: 600, alignSelf: "center", paddingHorizontal: 24, paddingBottom: 24 },
-  back: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center" },
+  fillContent: { flexGrow: 1 },
   title: { fontSize: 34, fontWeight: "700", color: notesColors.text, marginTop: 12 },
+  noteCount: { marginTop: 4, fontSize: 15, color: notesColors.muted },
+  emptyState: {
+    flex: 1,
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    backgroundColor: "#FCE7F1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: { fontSize: 22, fontWeight: "700", color: notesColors.text },
   section: { marginTop: 24, gap: 12 },
   heading: { fontSize: 18, fontWeight: "600", color: notesColors.text },
-  bodyField: { minHeight: 240, textAlignVertical: "top" },
-  message: { fontSize: 16, lineHeight: 24, color: notesColors.muted },
-  error: { fontSize: 15, color: "#B42318" },
-  menuBackdrop: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.15)" },
-  menuRow: { width: "100%", maxWidth: 600, alignSelf: "center", alignItems: "flex-end", paddingHorizontal: 24, paddingTop: 68, pointerEvents: "box-none" },
-  menu: {
-    width: 220,
-    maxWidth: "100%",
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: notesColors.surface,
-    boxShadow: "0px 4px 18px rgba(23, 23, 23, 0.12)",
+  editor: { flex: 1, paddingTop: 12, gap: 8 },
+  editorDate: { color: notesColors.muted, textAlign: "center", fontSize: 14 },
+  editorTitle: { minHeight: 48, paddingVertical: 8, color: notesColors.text, fontSize: 26, fontWeight: "700" },
+  bodyField: {
+    flex: 1,
+    minHeight: 180,
+    paddingTop: 8,
+    color: notesColors.text,
+    fontSize: 18,
+    lineHeight: 26,
+    textAlignVertical: "top",
   },
-  menuHeading: { fontSize: 13, fontWeight: "600", color: notesColors.muted, padding: 12 },
+  message: { fontSize: 16, lineHeight: 24, color: notesColors.muted },
+  error: { fontSize: 15, color: dangerColor },
+  menuBackdrop: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.06)" },
+  menuRow: { width: "100%", maxWidth: 600, alignSelf: "center", alignItems: "flex-end", paddingHorizontal: 24, paddingTop: 68, pointerEvents: "box-none" },
+  editorMenuRow: { paddingRight: 56 },
+  menu: {
+    width: 244,
+    maxWidth: "100%",
+    padding: 10,
+  },
   menuItem: {
     minHeight: 44,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: 7,
   },
   menuLabel: { fontSize: 15, fontWeight: "600", color: notesColors.text },
-  sortSelected: { backgroundColor: notesColors.background },
+  deleteLabel: { fontSize: 15, fontWeight: "600", color: dangerColor },
+  sortText: { flex: 1, minWidth: 0 },
+  sortSubtitle: { fontSize: 12, color: notesColors.muted, marginTop: 2 },
+  sortChoices: { marginTop: 2 },
+  sortCheck: { width: 20, alignItems: "center" },
+  menuDivider: { height: StyleSheet.hairlineWidth, backgroundColor: notesColors.border, marginHorizontal: 12, marginVertical: 4 },
   timestamp: { fontSize: 13, color: notesColors.muted },
   card: {
     backgroundColor: notesColors.surface,
