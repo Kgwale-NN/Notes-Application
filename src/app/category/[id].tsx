@@ -11,6 +11,16 @@ import { categories, useNotes, type Note } from "@/hooks/use-notes";
 
 type Draft = Pick<Note, "title" | "body"> & { id?: string };
 
+const sortOptions = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+] as const;
+
+const dateFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useNotes();
@@ -29,6 +39,7 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
   const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const categoryNotes = notes.filter(note => note.category === category.id);
   const query = search.trim().toLowerCase();
   const matchingNotes = query
@@ -37,6 +48,13 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
         note.body.toLowerCase().includes(query)
       )
     : categoryNotes;
+  const sortedNotes = [...matchingNotes].sort((left, right) => {
+    if (!left.createdAt) return right.createdAt ? 1 : 0;
+    if (!right.createdAt) return -1;
+
+    const difference = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+    return sortOrder === "oldest" ? difference : -difference;
+  });
   const savedNote = draft?.id ? categoryNotes.find(note => note.id === draft.id) : null;
   const hasUnsavedChanges = draft !== null && (
     draft.title !== (savedNote?.title ?? "") ||
@@ -162,16 +180,32 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
                 onPress={() => openDraft({ title: "", body: "" })}
               />
               {categoryNotes.length > 0 ? (
-                <FormField
-                  label="Search notes"
-                  placeholder="Search by title or text"
-                  value={search}
-                  onChangeText={setSearch}
-                  clearButtonMode="while-editing"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                />
+                <>
+                  <FormField
+                    label="Search notes"
+                    placeholder="Search by title or text"
+                    value={search}
+                    onChangeText={setSearch}
+                    clearButtonMode="while-editing"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                  />
+                  <Text style={styles.sortLabel}>Sort by date added</Text>
+                  <View style={styles.sortOptions}>
+                    {sortOptions.map(({ value, label }) => (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: sortOrder === value }}
+                        onPress={() => setSortOrder(value)}
+                        style={[styles.sortButton, sortOrder === value && styles.sortSelected]}
+                      >
+                        <Text style={styles.sortLabel}>{label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
               ) : null}
               {categoryNotes.length === 0 ? (
                 <Text style={styles.message}>No notes in this category yet.</Text>
@@ -180,7 +214,7 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
                   No notes match your search.
                 </Text>
               ) : (
-                matchingNotes.map(note => (
+                sortedNotes.map(note => (
                   <Pressable
                     key={note.id}
                     accessibilityRole="button"
@@ -190,6 +224,12 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
                     <View style={styles.cardText}>
                       <Text style={styles.heading} numberOfLines={2}>{note.title || "Untitled note"}</Text>
                       {note.body ? <Text style={styles.message} numberOfLines={3}>{note.body}</Text> : null}
+                      <Text style={styles.timestamp}>
+                        {note.createdAt ? "Added " + dateFormat.format(new Date(note.createdAt)) : "Date added unavailable"}
+                      </Text>
+                      {note.updatedAt ? (
+                        <Text style={styles.timestamp}>Edited {dateFormat.format(new Date(note.updatedAt))}</Text>
+                      ) : null}
                     </View>
                     <AppIcon name="chevronRight" size={16} color={notesColors.muted} />
                   </Pressable>
@@ -231,6 +271,17 @@ const styles = StyleSheet.create({
   bodyField: { minHeight: 240, textAlignVertical: "top" },
   message: { fontSize: 16, lineHeight: 24, color: notesColors.muted },
   error: { fontSize: 15, color: "#B42318" },
+  sortLabel: { fontSize: 14, fontWeight: "600", color: notesColors.text },
+  sortOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  sortButton: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: notesColors.border,
+  },
+  sortSelected: { backgroundColor: notesColors.accent },
+  timestamp: { fontSize: 13, color: notesColors.muted },
   card: {
     backgroundColor: notesColors.surface,
     borderColor: notesColors.border,

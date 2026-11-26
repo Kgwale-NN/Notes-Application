@@ -19,6 +19,8 @@ export type Note = {
   category: CategoryId;
   title: string;
   body: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 function useNotesState() {
@@ -67,8 +69,19 @@ function useNotesState() {
   }
 
   function saveNote(category: CategoryId, draft: Pick<Note, "title" | "body">, id?: string) {
-    const note = { ...draft, category, id: id ?? randomUUID() };
-    return persist([note, ...notes.filter(item => item.id !== note.id)]);
+    const now = new Date().toISOString();
+
+    if (id !== undefined) {
+      const existing = notes.find(note => note.id === id && note.category === category);
+      if (!existing) throw new Error("This note no longer exists.");
+      if (existing.title === draft.title && existing.body === draft.body) return Promise.resolve();
+
+      const updated = { ...existing, ...draft, updatedAt: now };
+      return persist([updated, ...notes.filter(note => note.id !== id)]);
+    }
+
+    const note: Note = { ...draft, category, id: randomUUID(), createdAt: now };
+    return persist([note, ...notes]);
   }
 
   function deleteNote(id: string) {
@@ -85,7 +98,13 @@ function isNote(value: unknown): value is Note {
   return typeof note.id === "string" &&
     typeof note.title === "string" &&
     typeof note.body === "string" &&
+    isOptionalDate(note.createdAt) &&
+    isOptionalDate(note.updatedAt) &&
     categories.some(category => category.id === note.category);
+}
+
+function isOptionalDate(value: unknown) {
+  return value === undefined || (typeof value === "string" && Number.isFinite(Date.parse(value)));
 }
 
 const NotesContext = createContext<ReturnType<typeof useNotesState> | null>(null);
