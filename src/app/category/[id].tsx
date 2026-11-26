@@ -95,8 +95,8 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
 
     const title = draft.title.trim();
     const body = draft.body.trim();
-    if (!title && !body) {
-      setError("Enter a title or write something in the note.");
+    if (!body) {
+      setError("Write something in the note before saving.");
       return;
     }
 
@@ -140,7 +140,7 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
           {draft ? (
             <View style={styles.section}>
               <Text accessibilityRole="header" style={styles.heading}>{draft.id ? "Edit note" : "New note"}</Text>
-              <FormField label="Title" value={draft.title} editable={!saving} onChangeText={title => setDraft({ ...draft, title })} />
+              <FormField label="Title (optional)" value={draft.title} editable={!saving} onChangeText={title => setDraft({ ...draft, title })} />
               <FormField
                 label="Note"
                 multiline

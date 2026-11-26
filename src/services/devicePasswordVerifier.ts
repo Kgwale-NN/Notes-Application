@@ -11,7 +11,11 @@ const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
 const hex256 = /^[0-9a-f]{64}$/;
 
 function storageKey(account: StoredAccount) {
-  return "notes.password-verifier.v1." + account.profile.id;
+  const { credentials } = account;
+  const key = "notes.password-verifier.v1." + account.profile.id;
+  return credentials.algorithm === "device-hmac-sha256" && credentials.keyId
+    ? key + "." + credentials.keyId
+    : key;
 }
 
 function credentialVersion({ credentials }: StoredAccount) {
@@ -81,5 +85,18 @@ export async function saveDevicePassword(account: StoredAccount, password: strin
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function removeDevicePassword(account: StoredAccount): Promise<void> {
+  try {
+    if (!(await SecureStore.isAvailableAsync())) return;
+    await withDeadline(
+      SecureStore.deleteItemAsync(storageKey(account), options),
+      1_500,
+      "The previous device password verifier could not be removed."
+    );
+  } catch {
+    // The saved account already points to the new verifier.
   }
 }

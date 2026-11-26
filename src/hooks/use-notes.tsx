@@ -1,7 +1,7 @@
 import { randomUUID } from "expo-crypto";
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
-import { loginAccount } from "@/services/accountService";
+import { loginAccount, updateAccount, type ProfileChanges } from "@/services/accountService";
 import { withDeadline } from "@/services/withDeadline";
 import { readData, saveData } from "@/storage/appStorage";
 import type { UserProfile } from "@/types/account";
@@ -52,6 +52,23 @@ function useNotesState() {
     setNotes([]);
   }
 
+  async function updateProfile(changes: ProfileChanges) {
+    if (!profile || writeInProgress.current) {
+      throw new Error("Your profile is currently unavailable. Please try again.");
+    }
+
+    writeInProgress.current = true;
+    setSaving(true);
+    try {
+      const updated = await updateAccount(profile.id, changes);
+      setProfile(updated);
+      return updated;
+    } finally {
+      writeInProgress.current = false;
+      setSaving(false);
+    }
+  }
+
   async function persist(next: Note[]) {
     if (!profile || writeInProgress.current) {
       throw new Error("Notes are currently unavailable. Please try again.");
@@ -88,7 +105,7 @@ function useNotesState() {
     return persist(notes.filter(note => note.id !== id));
   }
 
-  return { profile, notes, saving, signIn, signOut, saveNote, deleteNote };
+  return { profile, notes, saving, signIn, signOut, updateProfile, saveNote, deleteNote };
 }
 
 function isNote(value: unknown): value is Note {

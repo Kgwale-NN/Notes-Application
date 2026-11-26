@@ -41,13 +41,21 @@ export default function CategoriesScreen() {
           ))}
         </View>
 
-        <AppButton
-          title={signingOut ? "Logging out…" : "Log out"}
-          variant="secondary"
-          disabled={saving}
-          loading={signingOut}
-          onPress={handleSignOut}
-        />
+        <View style={styles.actions}>
+          <AppButton
+            title="Profile"
+            variant="secondary"
+            disabled={saving || signingOut}
+            onPress={() => router.push("/profile")}
+          />
+          <AppButton
+            title={signingOut ? "Logging out…" : "Log out"}
+            variant="secondary"
+            disabled={saving}
+            loading={signingOut}
+            onPress={handleSignOut}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -71,4 +79,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 34, fontWeight: "700", color: notesColors.text },
   subtitle: { fontSize: 16, lineHeight: 24, color: notesColors.muted, marginTop: 8 },
   categories: { marginVertical: 28, gap: 12 },
+  actions: { gap: 12 },
 });
