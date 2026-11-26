@@ -25,12 +25,12 @@ function RootNavigator() {
       headerShown: false,
       contentStyle: { backgroundColor: notesColors.background },
     }}>
-      <Stack.Protected guard={!isSignedIn}>
+      <Stack.Protected guard={!isSignedIn} redirectTo="/categories">
         <Stack.Screen name="login" />
         <Stack.Screen name="index" />
         <Stack.Screen name="register" />
       </Stack.Protected>
-      <Stack.Protected guard={isSignedIn}>
+      <Stack.Protected guard={isSignedIn} redirectTo="/login">
         <Stack.Screen name="categories" />
         <Stack.Screen name="category/[id]" />
         <Stack.Screen name="profile" />

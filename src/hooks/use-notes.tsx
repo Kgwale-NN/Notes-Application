@@ -2,21 +2,22 @@ import { randomUUID } from "expo-crypto";
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
 import { loginAccount, updateAccount, type ProfileChanges } from "@/services/accountService";
+import { authFeedbackDelay } from "@/services/authFeedback";
 import { withDeadline } from "@/services/withDeadline";
 import { readData, saveData } from "@/storage/appStorage";
 import type { UserProfile } from "@/types/account";
 
-export const categories = [
+export type Category = { id: string; name: string };
+
+const defaultCategories: Category[] = [
   { id: "work", name: "Work" },
   { id: "study", name: "Study" },
   { id: "personal", name: "Personal" },
-] as const;
-
-type CategoryId = (typeof categories)[number]["id"];
+];
 
 export type Note = {
   id: string;
-  category: CategoryId;
+  category: string;
   title: string;
   body: string;
   createdAt?: string;
@@ -26,22 +27,33 @@ export type Note = {
 function useNotesState() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [folders, setFolders] = useState<Category[]>([]);
+  const categories = [...defaultCategories, ...folders];
   const [saving, setSaving] = useState(false);
   const writeInProgress = useRef(false);
 
   async function signIn(email: string, password: string) {
+    const feedback = authFeedbackDelay();
     const account = await loginAccount(email, password);
-    const saved = await withDeadline(
-      readData("notes:" + account.id),
+    const [saved, savedFolders] = await withDeadline(
+      Promise.all([readData("notes:" + account.id), readData("folders:" + account.id)]),
       8_000,
       "Notes could not open your saved notes. Close and reopen the app, then try again."
     );
 
-    if (saved !== null && (!Array.isArray(saved) || !saved.every(isNote))) {
+    if (savedFolders !== null && (!Array.isArray(savedFolders) || !savedFolders.every(isFolder))) {
+      throw new Error("Saved folders could not be read.");
+    }
+
+    const folderIds = new Set([...defaultCategories, ...(savedFolders ?? [])].map(folder => folder.id));
+    if (saved !== null && (!Array.isArray(saved) || !saved.every(note => isNote(note, folderIds)))) {
       throw new Error("Saved notes could not be read.");
     }
 
+    // Updating the profile lets the protected navigator leave the login screen.
+    await feedback;
     setNotes(saved ?? []);
+    setFolders(savedFolders ?? []);
     setProfile(account);
   }
 
@@ -50,6 +62,7 @@ function useNotesState() {
 
     setProfile(null);
     setNotes([]);
+    setFolders([]);
   }
 
   async function updateProfile(changes: ProfileChanges) {
@@ -69,7 +82,7 @@ function useNotesState() {
     }
   }
 
-  async function persist(next: Note[]) {
+  async function persist(write: (accountId: string) => Promise<void>) {
     if (!profile || writeInProgress.current) {
       throw new Error("Notes are currently unavailable. Please try again.");
     }
@@ -77,15 +90,36 @@ function useNotesState() {
     writeInProgress.current = true;
     setSaving(true);
     try {
-      await saveData("notes:" + profile.id, next);
-      setNotes(next);
+      await write(profile.id);
     } finally {
       writeInProgress.current = false;
       setSaving(false);
     }
   }
 
-  function saveNote(category: CategoryId, draft: Pick<Note, "title" | "body">, id?: string) {
+  function persistNotes(next: Note[]) {
+    return persist(async accountId => {
+      await saveData("notes:" + accountId, next);
+      setNotes(next);
+    });
+  }
+
+  async function createFolder(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) throw new Error("Enter a folder name.");
+    if (categories.some(folder => folder.name.toLowerCase() === cleanName.toLowerCase())) {
+      throw new Error("A folder with that name already exists.");
+    }
+
+    const next = [...folders, { id: randomUUID(), name: cleanName }];
+    await persist(async accountId => {
+      await saveData("folders:" + accountId, next);
+      setFolders(next);
+    });
+  }
+
+  function saveNote(category: string, draft: Pick<Note, "title" | "body">, id?: string) {
+    if (!categories.some(folder => folder.id === category)) throw new Error("This folder no longer exists.");
     const now = new Date().toISOString();
 
     if (id !== undefined) {
@@ -94,21 +128,28 @@ function useNotesState() {
       if (existing.title === draft.title && existing.body === draft.body) return Promise.resolve();
 
       const updated = { ...existing, ...draft, updatedAt: now };
-      return persist([updated, ...notes.filter(note => note.id !== id)]);
+      return persistNotes([updated, ...notes.filter(note => note.id !== id)]);
     }
 
     const note: Note = { ...draft, category, id: randomUUID(), createdAt: now };
-    return persist([note, ...notes]);
+    return persistNotes([note, ...notes]);
   }
 
   function deleteNote(id: string) {
-    return persist(notes.filter(note => note.id !== id));
+    return persistNotes(notes.filter(note => note.id !== id));
   }
 
-  return { profile, notes, saving, signIn, signOut, updateProfile, saveNote, deleteNote };
+  return { profile, notes, categories, saving, signIn, signOut, updateProfile, createFolder, saveNote, deleteNote };
 }
 
-function isNote(value: unknown): value is Note {
+function isFolder(value: unknown): value is Category {
+  if (typeof value !== "object" || value === null) return false;
+
+  const folder = value as Partial<Category>;
+  return typeof folder.id === "string" && typeof folder.name === "string";
+}
+
+function isNote(value: unknown, folderIds: Set<string>): value is Note {
   if (typeof value !== "object" || value === null) return false;
 
   const note = value as Partial<Note>;
@@ -117,7 +158,8 @@ function isNote(value: unknown): value is Note {
     typeof note.body === "string" &&
     isOptionalDate(note.createdAt) &&
     isOptionalDate(note.updatedAt) &&
-    categories.some(category => category.id === note.category);
+    typeof note.category === "string" &&
+    folderIds.has(note.category);
 }
 
 function isOptionalDate(value: unknown) {

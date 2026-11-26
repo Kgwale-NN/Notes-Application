@@ -5,6 +5,10 @@ import { notesColors } from "@/constants/notes-theme";
 
 const icons = {
   plus: { ios: "plus", android: "add", web: "add" },
+  folderPlus: { ios: "folder.badge.plus", android: "create_new_folder", web: "create_new_folder" },
+  profile: { ios: "person.crop.circle", android: "account_circle", web: "account_circle" },
+  search: { ios: "magnifyingglass", android: "search", web: "search" },
+  close: { ios: "xmark.circle.fill", android: "cancel", web: "cancel" },
   chevronLeft: {
     ios: "chevron.left",
     android: "chevron_left",

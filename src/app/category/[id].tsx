@@ -7,7 +7,8 @@ import AppButton from "@/components/AppButton";
 import AppIcon from "@/components/AppIcon";
 import FormField from "@/components/FormField";
 import { notesColors } from "@/constants/notes-theme";
-import { categories, useNotes, type Note } from "@/hooks/use-notes";
+import { useNotes, type Category, type Note } from "@/hooks/use-notes";
+import { searchNotes } from "@/services/noteSearch";
 
 type Draft = Pick<Note, "title" | "body"> & { id?: string };
 
@@ -22,31 +23,26 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
 });
 
 export default function CategoryScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, noteId } = useLocalSearchParams<{ id: string; noteId?: string }>();
+  const { categories, notes } = useNotes();
   const category = categories.find(item => item.id === id);
 
   if (!category) return <Redirect href="/categories" />;
 
-  return <CategoryNotes key={category.id} category={category} />;
+  const selectedNote = noteId ? notes.find(note => note.id === noteId && note.category === id) : undefined;
+  return <CategoryNotes key={category.id + ":" + (noteId ?? "")} category={category} selectedNote={selectedNote} />;
 }
 
-function CategoryNotes({ category }: { category: (typeof categories)[number] }) {
+function CategoryNotes({ category, selectedNote }: { category: Category; selectedNote?: Note }) {
   const { notes, saving, saveNote, deleteNote } = useNotes();
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(selectedNote ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const categoryNotes = notes.filter(note => note.category === category.id);
-  const searchWords = search.toLowerCase().match(/\S+/g) ?? [];
-  const matchingNotes = searchWords.length > 0
-    ? categoryNotes.filter(note => {
-        const title = note.title.toLowerCase();
-        const body = note.body.toLowerCase();
-        return searchWords.every(word => title.includes(word) || body.includes(word));
-      })
-    : categoryNotes;
+  const matchingNotes = searchNotes(categoryNotes, search);
   const sortedNotes = [...matchingNotes].sort((left, right) => {
     if (!left.createdAt) return right.createdAt ? 1 : 0;
     if (!right.createdAt) return -1;
