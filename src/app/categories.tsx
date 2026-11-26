@@ -59,25 +59,13 @@ function HeaderButton({ label, icon, onPress, disabled }: {
 }
 
 export default function CategoriesScreen() {
-  const { categories, notes, signOut, saving, createFolder } = useNotes();
-  const [signingOut, setSigningOut] = useState(false);
+  const { categories, notes, saving, createFolder } = useNotes();
   const [search, setSearch] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [folderName, setFolderName] = useState("");
   const [folderError, setFolderError] = useState("");
   const searching = search.trim().length > 0;
   const results = searching ? searchNotes(notes, search) : [];
-
-  function handleSignOut() {
-    setSigningOut(true);
-    // Give the loading state one frame to paint before the session closes.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        signOut();
-        setSigningOut(false);
-      });
-    });
-  }
 
   function openNewFolder() {
     Keyboard.dismiss();
@@ -103,8 +91,8 @@ export default function CategoriesScreen() {
         <View style={styles.header}>
           <View style={styles.accentLine} />
           <View style={styles.headerButtons}>
-            <HeaderButton label="New folder" icon="folderPlus" onPress={openNewFolder} disabled={saving || signingOut} />
-            <HeaderButton label="Profile" icon="profile" onPress={() => router.push("/profile")} disabled={saving || signingOut} />
+            <HeaderButton label="New folder" icon="folderPlus" onPress={openNewFolder} disabled={saving} />
+            <HeaderButton label="Profile" icon="profile" onPress={() => router.push("/profile")} disabled={saving} />
           </View>
         </View>
 
@@ -154,13 +142,6 @@ export default function CategoriesScreen() {
                   />
                 ))}
               </View>
-              <AppButton
-                title={signingOut ? "Logging out…" : "Log out"}
-                variant="secondary"
-                disabled={saving}
-                loading={signingOut}
-                onPress={handleSignOut}
-              />
             </>
           )}
         </ScrollView>

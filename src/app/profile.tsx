@@ -25,10 +25,12 @@ export default function ProfileScreen() {
 }
 
 function ProfileForm({ profile }: { profile: UserProfile }) {
-  const { saving, updateProfile } = useNotes();
+  const { saving, signOut, updateProfile } = useNotes();
   const [form, setForm] = useState(() => profileForm(profile));
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const busy = saving || signingOut;
   const changed = form.username.trim() !== profile.username ||
     form.email.trim().toLowerCase() !== profile.email ||
     form.newPassword !== "" ||
@@ -43,7 +45,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
   }
 
   async function saveProfile() {
-    if (saving || !changed) return;
+    if (busy || !changed) return;
     if (form.newPassword !== form.confirmPassword) {
       setError("Your new passwords do not match.");
       return;
@@ -61,6 +63,20 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
     }
   }
 
+  function handleSignOut() {
+    if (busy) return;
+
+    Keyboard.dismiss();
+    setSigningOut(true);
+    // Give the loading state one frame to paint before the session closes.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        signOut();
+        setSigningOut(false);
+      });
+    });
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -69,7 +85,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             title="Back to categories"
             icon="chevronLeft"
             variant="secondary"
-            disabled={saving}
+            disabled={busy}
             onPress={() => router.canGoBack() ? router.back() : router.replace("/categories")}
           />
           <Text accessibilityRole="header" style={styles.heading}>Profile</Text>
@@ -80,7 +96,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="username"
-            editable={!saving}
+            editable={!busy}
           />
           <FormField
             label="Email"
@@ -90,7 +106,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="email"
-            editable={!saving}
+            editable={!busy}
           />
           <FormField
             label="Current password"
@@ -99,7 +115,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             autoComplete="current-password"
             autoCapitalize="none"
             secureTextEntry
-            editable={!saving}
+            editable={!busy}
           />
           <FormField
             label="New password (optional)"
@@ -108,7 +124,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             autoComplete="new-password"
             autoCapitalize="none"
             secureTextEntry
-            editable={!saving}
+            editable={!busy}
           />
           {form.newPassword || form.confirmPassword ? (
             <FormField
@@ -118,7 +134,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
               autoComplete="new-password"
               autoCapitalize="none"
               secureTextEntry
-              editable={!saving}
+              editable={!busy}
             />
           ) : null}
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
@@ -127,7 +143,14 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             title={saving ? "Saving profile…" : "Save changes"}
             onPress={saveProfile}
             loading={saving}
-            disabled={!changed}
+            disabled={!changed || signingOut}
+          />
+          <AppButton
+            title={signingOut ? "Logging out…" : "Log out"}
+            variant="secondary"
+            disabled={saving}
+            loading={signingOut}
+            onPress={handleSignOut}
           />
         </ScrollView>
       </KeyboardAvoidingView>
