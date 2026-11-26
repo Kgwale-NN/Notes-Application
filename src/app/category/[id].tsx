@@ -28,7 +28,15 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [discardPrompt, setDiscardPrompt] = useState<{ leave?: () => void } | null>(null);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
   const categoryNotes = notes.filter(note => note.category === category.id);
+  const query = search.trim().toLowerCase();
+  const matchingNotes = query
+    ? categoryNotes.filter(note =>
+        note.title.toLowerCase().includes(query) ||
+        note.body.toLowerCase().includes(query)
+      )
+    : categoryNotes;
   const savedNote = draft?.id ? categoryNotes.find(note => note.id === draft.id) : null;
   const hasUnsavedChanges = draft !== null && (
     draft.title !== (savedNote?.title ?? "") ||
@@ -153,10 +161,26 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
                 icon="plus"
                 onPress={() => openDraft({ title: "", body: "" })}
               />
+              {categoryNotes.length > 0 ? (
+                <FormField
+                  label="Search notes"
+                  placeholder="Search by title or text"
+                  value={search}
+                  onChangeText={setSearch}
+                  clearButtonMode="while-editing"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+              ) : null}
               {categoryNotes.length === 0 ? (
                 <Text style={styles.message}>No notes in this category yet.</Text>
+              ) : matchingNotes.length === 0 ? (
+                <Text style={styles.message} accessibilityLiveRegion="polite">
+                  No notes match your search.
+                </Text>
               ) : (
-                categoryNotes.map(note => (
+                matchingNotes.map(note => (
                   <Pressable
                     key={note.id}
                     accessibilityRole="button"
