@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 
+import AppIcon, { type AppIconName } from "@/components/AppIcon";
 import { notesColors } from "@/constants/notes-theme";
 
 type AppButtonProps = {
@@ -8,6 +9,7 @@ type AppButtonProps = {
     variant?: "primary" | "secondary";
     disabled?: boolean;
     loading?: boolean;
+    icon?: AppIconName;
 };
 
 export default function AppButton({
@@ -16,6 +18,7 @@ export default function AppButton({
     variant = "primary",
     disabled = false,
     loading = false,
+    icon,
 }: AppButtonProps) {
     const unavailable = disabled || loading;
 
@@ -37,6 +40,7 @@ export default function AppButton({
             ]}
         >
             {loading && <ActivityIndicator size="small" color={notesColors.text} />}
+            {!loading && icon && <AppIcon name={icon} />}
             <Text style={styles.title}>{title}</Text>
         </Pressable>
 

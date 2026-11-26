@@ -116,7 +116,11 @@ function CategoryNotes({ category }: { category: (typeof categories)[number] }) 
             </View>
           ) : (
             <View style={styles.section}>
-              <AppButton title="New note" onPress={() => openDraft({ title: "", body: "" })} />
+              <AppButton
+                title="New note"
+                icon="plus"
+                onPress={() => openDraft({ title: "", body: "" })}
+              />
               {categoryNotes.length === 0 ? (
                 <Text style={styles.message}>No notes in this category yet.</Text>
               ) : (
