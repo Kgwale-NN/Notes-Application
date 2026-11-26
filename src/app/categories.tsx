@@ -1,4 +1,4 @@
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,10 +9,8 @@ import { notesColors } from "@/constants/notes-theme";
 import { categories, useNotes } from "@/hooks/use-notes";
 
 export default function CategoriesScreen() {
-  const { profile, notes, signOut, saving } = useNotes();
+  const { notes, signOut, saving } = useNotes();
   const [signingOut, setSigningOut] = useState(false);
-
-  if (!profile) return <Redirect href="/login" />;
 
   function handleSignOut() {
     setSigningOut(true);

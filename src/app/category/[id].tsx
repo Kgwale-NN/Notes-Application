@@ -23,10 +23,8 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
 
 export default function CategoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile } = useNotes();
   const category = categories.find(item => item.id === id);
 
-  if (!profile) return <Redirect href="/login" />;
   if (!category) return <Redirect href="/categories" />;
 
   return <CategoryNotes key={category.id} category={category} />;

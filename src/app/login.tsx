@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -14,7 +14,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
 
-    const { profile, signIn } = useNotes();
+    const { signIn } = useNotes();
     const submitting = useRef(false);
     const [busy, setBusy] = useState(false);
 
@@ -43,8 +43,6 @@ export default function LoginScreen() {
             setBusy(false);
         }
     }
-
-    if (profile) return <Redirect href="/categories" />;
 
     function goBack() {
         if (router.canGoBack()) {
